@@ -20,7 +20,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
 # Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Use --no-build-isolation so packages can use the upgraded setuptools
+# This prevents: ModuleNotFoundError: No module named 'pkg_resources' in openai-whisper build
+RUN pip install --no-cache-dir --no-build-isolation -r requirements.txt
 
 # Copy application code
 COPY . .
