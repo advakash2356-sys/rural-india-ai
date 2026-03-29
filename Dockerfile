@@ -15,6 +15,10 @@ RUN apt-get update && apt-get install -y \
 # Copy requirements
 COPY requirements.txt .
 
+# Upgrade pip and install build tools BEFORE requirements
+# This fixes: ModuleNotFoundError: No module named 'pkg_resources'
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
