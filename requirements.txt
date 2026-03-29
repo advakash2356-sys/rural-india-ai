@@ -9,6 +9,10 @@ uvicorn==0.24.0
 pydantic==2.4.2
 requests==2.31.0
 
+# Authentication & Security
+google-auth==2.27.0
+google-auth-httplib2==0.2.0
+
 # System & Hardware Monitoring
 psutil==5.9.6
 paho-mqtt==1.6.1

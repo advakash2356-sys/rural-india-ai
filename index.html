@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rural India AI - Beta Testing Platform</title>
+    
+    <!-- Google Identity Services -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    
     <style>
         * {
             margin: 0;
@@ -552,6 +556,128 @@
             color: #856404;
         }
 
+        /* ===== AUTHENTICATION UI ===== */
+        .auth-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        .auth-screen.hidden {
+            display: none;
+        }
+
+        .auth-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 50px 40px;
+            max-width: 400px;
+            text-align: center;
+            animation: slideUp 0.3s ease;
+        }
+
+        .auth-card h1 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.8em;
+        }
+
+        .auth-card p {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1em;
+            line-height: 1.6;
+        }
+
+        .google-signin-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        /* Override Google button styling */
+        .google-signin-container > div {
+            transform: scale(1.2);
+        }
+
+        .auth-status {
+            background-color: #e8f5e9;
+            border: 1px solid #4caf50;
+            color: #2e7d32;
+            padding: 12px 15px;
+            border-radius: 6px;
+            margin-top: 20px;
+            font-size: 0.95em;
+        }
+
+        .auth-status.error {
+            background-color: #ffebee;
+            border-color: #d32f2f;
+            color: #c62828;
+        }
+
+        .user-info-header {
+            background: white;
+            padding: 15px 20px;
+            border-bottom: 1px solid #e0e0e0;
+            display: none;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .user-info-header.visible {
+            display: flex;
+        }
+
+        .user-welcome {
+            font-size: 0.95em;
+            color: #333;
+        }
+
+        .user-welcome strong {
+            color: #667eea;
+        }
+
+        .user-email {
+            font-size: 0.85em;
+            color: #999;
+            margin-top: 2px;
+        }
+
+        .btn-logout {
+            padding: 8px 15px;
+            background-color: #ff6b6b;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-logout:hover {
+            background-color: #ff5252;
+            transform: translateY(-2px);
+        }
+
+        /* Hide content until authenticated */
+        .app-content {
+            display: none;
+        }
+
+        .app-content.authenticated {
+            display: block;
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .chat-window {
@@ -636,8 +762,37 @@
         </div>
     </div>
 
+    <!-- ===== AUTHENTICATION SCREEN ===== -->
+    <div class="auth-screen" id="authScreen">
+        <div class="auth-card">
+            <h1>🔐 Rural India AI</h1>
+            <p>Sign in with your Google account to access the beta platform.</p>
+            
+            <div class="google-signin-container">
+                <div id="g_id_onload"
+                     data-client_id="YOUR_GOOGLE_CLIENT_ID_HERE"
+                     data-callback="handleGoogleSignIn">
+                </div>
+                <div class="g_id_signin" data-type="standard" data-size="medium" data-theme="outline"></div>
+            </div>
+            
+            <div id="authStatusMessage" class="auth-status" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- ===== USER INFO HEADER ===== -->
+    <div class="user-info-header" id="userInfoHeader">
+        <div>
+            <div class="user-welcome">
+                Welcome, <strong id="userFullName"></strong>
+            </div>
+            <div class="user-email" id="userEmailDisplay"></div>
+        </div>
+        <button class="btn-logout" onclick="handleLogout()">🚪 Logout</button>
+    </div>
+
     <!-- ===== MAIN APP CONTENT ===== -->
-    <div class="app-content">
+    <div class="app-content" id="appContent">
         <!-- Beta Warning Banner -->
         <div class="beta-warning-banner">
             BETA VERSION: AI responses may be inaccurate. Do not use for medical emergencies.
@@ -790,6 +945,178 @@
         // Alternative for local testing:
         // const API_BASE_URL = 'http://localhost:8000';
 
+        // ===== AUTHENTICATION STATE =====
+        let googleToken = null;
+        let currentUser = {
+            name: null,
+            email: null
+        };
+
+        // ===== GOOGLE AUTHENTICATION HANDLERS =====
+
+        /**
+         * Handle Google Sign-In callback
+         * Called by Google Identity Services when user successfully signs in
+         */
+        function handleGoogleSignIn(response) {
+            console.log('🔐 Google Sign-In callback received');
+            
+            if (!response.credential) {
+                showAuthError('Sign-in failed. Please try again.');
+                return;
+            }
+
+            try {
+                // Decode JWT to get user info (no verification needed on frontend - backend will verify)
+                googleToken = response.credential;
+                const decoded = decodeJWT(googleToken);
+                
+                if (!decoded || !decoded.email) {
+                    throw new Error('Invalid token: missing email');
+                }
+
+                // Store user information
+                currentUser.name = decoded.name || decoded.email.split('@')[0];
+                currentUser.email = decoded.email;
+
+                // Store token securely (sessionStorage - cleared on browser close)
+                sessionStorage.setItem('google_token', googleToken);
+                sessionStorage.setItem('user_name', currentUser.name);
+                sessionStorage.setItem('user_email', currentUser.email);
+
+                console.log(`✅ Authenticated as ${currentUser.email}`);
+                
+                // Show auth success
+                showAuthSuccess(`Successfully signed in as ${currentUser.name}!`);
+                
+                // Hide auth screen and show app after short delay
+                setTimeout(() => {
+                    hideAuthScreen();
+                }, 1000);
+
+            } catch (error) {
+                console.error('❌ Authentication error:', error);
+                showAuthError(`Authentication failed: ${error.message}`);
+            }
+        }
+
+        /**
+         * Decode JWT without verification (verification happens on backend)
+         * @param {string} token - JWT token
+         * @returns {object} Decoded payload
+         */
+        function decodeJWT(token) {
+            try {
+                const base64Url = token.split('.')[1];
+                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                const jsonPayload = decodeURIComponent(
+                    atob(base64).split('').map((c) => {
+                        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                    }).join('')
+                );
+                return JSON.parse(jsonPayload);
+            } catch (error) {
+                console.error('❌ JWT decode error:', error);
+                return null;
+            }
+        }
+
+        /**
+         * Show authentication success message
+         * @param {string} message - Success message
+         */
+        function showAuthSuccess(message) {
+            const statusEl = document.getElementById('authStatusMessage');
+            statusEl.textContent = `✅ ${message}`;
+            statusEl.classList.remove('error');
+            statusEl.style.display = 'block';
+        }
+
+        /**
+         * Show authentication error message
+         * @param {string} message - Error message
+         */
+        function showAuthError(message) {
+            const statusEl = document.getElementById('authStatusMessage');
+            statusEl.textContent = `❌ ${message}`;
+            statusEl.classList.add('error');
+            statusEl.style.display = 'block';
+        }
+
+        /**
+         * Hide auth screen and show app
+         */
+        function hideAuthScreen() {
+            const authScreen = document.getElementById('authScreen');
+            const appContent = document.getElementById('appContent');
+            const userHeader = document.getElementById('userInfoHeader');
+
+            authScreen.classList.add('hidden');
+            appContent.classList.add('authenticated');
+            userHeader.classList.add('visible');
+
+            // Display user info
+            document.getElementById('userFullName').textContent = currentUser.name;
+            document.getElementById('userEmailDisplay').textContent = currentUser.email;
+
+            console.log('🚀 App content now visible');
+        }
+
+        /**
+         * Handle logout
+         */
+        function handleLogout() {
+            // Clear storage
+            sessionStorage.removeItem('google_token');
+            sessionStorage.removeItem('user_name');
+            sessionStorage.removeItem('user_email');
+
+            // Clear state
+            googleToken = null;
+            currentUser = { name: null, email: null };
+
+            // Sign out from Google
+            google?.accounts?.id?.revoke(currentUser.email, () => {
+                console.log('✅ Logged out');
+            });
+
+            // Reload page
+            location.reload();
+        }
+
+        /**
+         * Check if user is already authenticated (from sessionStorage)
+         */
+        function checkExistingAuth() {
+            const token = sessionStorage.getItem('google_token');
+            const name = sessionStorage.getItem('user_name');
+            const email = sessionStorage.getItem('user_email');
+
+            if (token && email) {
+                googleToken = token;
+                currentUser = { name, email };
+                hideAuthScreen();
+                return true;
+            }
+            return false;
+        }
+
+        /**
+         * Get authorization headers for API calls
+         * @returns {object} Headers object with Authorization Bearer token
+         */
+        function getAuthHeaders() {
+            if (!googleToken) {
+                console.warn('⚠️ No authentication token available');
+                return { 'Content-Type': 'application/json' };
+            }
+
+            return {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${googleToken}`
+            };
+        }
+
         // ===== STATE MANAGEMENT =====
         let mediaRecorder = null;
         let recordedChunks = [];
@@ -937,12 +1264,10 @@
             addChatMessage('Thinking...', 'loading');
             
             try {
-                // Call backend API
+                // Call backend API with Authentication
                 const response = await fetch(`${API_BASE_URL}/api/v4/agents/query`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: getAuthHeaders(),
                     body: JSON.stringify({
                         query: query,
                         agent_type: 'auto'  // Backend auto-detects which agent to use
@@ -1140,11 +1465,15 @@
                 
                 document.getElementById('micStatus').textContent = '⏳ Uploading and processing...';
                 
-                // Send to backend voice API
+                // Send to backend voice API with Authentication
+                const headers = getAuthHeaders();
+                // Remove Content-Type for FormData - browser will set it with boundary
+                delete headers['Content-Type'];
+                
                 const response = await fetch(`${API_BASE_URL}/api/v2/voice`, {
                     method: 'POST',
+                    headers: headers,
                     body: formData
-                    // Note: Don't set Content-Type header - browser will set it with boundary
                 });
                 
                 if (!response.ok) {
@@ -1205,30 +1534,44 @@
         // ===== PAGE INITIALIZATION =====
         
         document.addEventListener('DOMContentLoaded', function() {
-            // Check consent
-            checkConsent();
-            preventScroll();
+            console.log('🚀 Rural India AI Frontend Loaded');
             
-            // Focus on text input
-            document.getElementById('textInput').focus();
+            // Check if user is already authenticated (from sessionStorage)
+            const isAuthenticated = checkExistingAuth();
             
-            // Add enter key to send message
-            document.getElementById('textInput').addEventListener('keypress', function(event) {
-                if (event.key === 'Enter' && !event.shiftKey) {
-                    event.preventDefault();
-                    handleTextQuery(event);
+            if (isAuthenticated) {
+                // User is authenticated - check consent
+                checkConsent();
+                preventScroll();
+            } else {
+                // Show auth screen if not authenticated
+                // Auth screen will show until user logs in via Google
+            }
+            
+            // Set up Chat event listeners (only used after authentication)
+            setTimeout(() => {
+                const textInput = document.getElementById('textInput');
+                if (textInput) {
+                    textInput.focus();
+                    
+                    // Add enter key to send message
+                    textInput.addEventListener('keypress', function(event) {
+                        if (event.key === 'Enter' && !event.shiftKey) {
+                            event.preventDefault();
+                            handleTextQuery(event);
+                        }
+                    });
                 }
-            });
+            }, 100);
             
-            // Prevent accidental page navigation without re-confirming
+            // Prevent accidental page navigation
             window.addEventListener('beforeunload', function(e) {
-                if (localStorage.getItem('ruralindiaai_consent') === 'true') {
-                    // Allow navigation
+                if (googleToken) {
+                    // Allow navigation for authenticated users
                     return;
                 }
             });
             
-            console.log('🚀 Rural India AI Frontend Loaded');
             console.log(`📡 Backend API: ${API_BASE_URL}`);
         });
 
