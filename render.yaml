@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: rural-india-ai
+    env: python
+    envVars:
+      - key: ENVIRONMENT
+        value: "production"
+      - key: DEBUG
+        value: "False"
+      - key: PORT
+        value: "8000"
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn api_server:app --host 0.0.0.0 --port $PORT --workers 2"
+    plan: standard
+    numInstances: 1
+    scaling:
+      minInstances: 1
+      maxInstances: 3
+      targetCPUUtilizationPercentage: 70
+    healthCheckPath: "/api/v1/health"
+    healthCheckInterval: 10
+    healthCheckTimeout: 5
+    preDeployCommand: "python3 verify_startup.py"

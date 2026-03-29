@@ -1,0 +1,93 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# Environment variables (CRITICAL for cloud deployment)
+.env
+.env.local
+.env.*.local
+.env.production
+.env.production.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+.pytest_cache/
+.coverage
+
+# Databases (CRITICAL - never commit)
+*.db
+*.sqlite
+*.sqlite3
+data/queue.db
+data/vector_db.json
+
+# Logs
+logs/
+*.log
+api_server.log
+error.log
+.api_server.pid
+htmlcov/
+.tox/
+
+# Runtime
+*.db
+*.sqlite
+*.sqlite3
+*.log
+data/
+models/*.gguf
+
+# Config with secrets
+config/edge_config.json
+deployment/example_village_config.json
+*.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+.dockerignore

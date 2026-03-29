@@ -1,0 +1,45 @@
+# Docker Compose for local development
+
+version: '3.8'
+
+services:
+  edge-node:
+    build:
+      context: .
+      dockerfile: deployment/Dockerfile.edge
+    ports:
+      - "8000:8000"
+    environment:
+      - MQTT_BROKER=mqtt-broker
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+    depends_on:
+      - mqtt-broker
+    networks:
+      - rural-ai-network
+
+  mqtt-broker:
+    image: eclipse-mosquitto:2.0
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./deployment/mosquitto.conf:/mosquitto/config/mosquitto.conf
+    networks:
+      - rural-ai-network
+
+  cloud-simulator:
+    image: python:3.11-slim
+    working_dir: /app
+    command: python /app/deployment/test_cloud_backend.py
+    ports:
+      - "8001:8001"
+    volumes:
+      - .:/app
+    networks:
+      - rural-ai-network
+
+networks:
+  rural-ai-network:
+    driver: bridge

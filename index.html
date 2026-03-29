@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rural India AI - Beta Testing Platform</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        /* Main Container */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* ===== BETA WARNING BANNER ===== */
+        .beta-warning-banner {
+            background-color: #ff6b6b;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: bold;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            font-size: 1.1em;
+        }
+
+        .beta-warning-banner::before {
+            content: "⚠️";
+            font-size: 1.3em;
+        }
+
+        /* ===== CONSENT MODAL - BLOCKING UI ===== */
+        #consentModal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .consent-modal-content {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 700px;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 40px;
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .consent-modal-content h1 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+            text-align: center;
+        }
+
+        .consent-modal-content p {
+            line-height: 1.6;
+            margin-bottom: 15px;
+            color: #555;
+        }
+
+        .consent-modal-content strong {
+            color: #333;
+            font-weight: 600;
+        }
+
+        .consent-terms {
+            background-color: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            border-radius: 6px;
+            margin: 20px 0;
+            font-size: 0.95em;
+            line-height: 1.7;
+        }
+
+        .consent-terms p {
+            margin-bottom: 12px;
+        }
+
+        .consent-terms p:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Checkbox styling */
+        .consent-checkbox-group {
+            margin: 25px 0;
+            display: flex;
+            align-items: start;
+            gap: 12px;
+        }
+
+        .consent-checkbox-group input[type="checkbox"] {
+            margin-top: 4px;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            accent-color: #667eea;
+        }
+
+        .consent-checkbox-group label {
+            cursor: pointer;
+            color: #333;
+            font-weight: 500;
+            flex: 1;
+            line-height: 1.5;
+        }
+
+        .consent-checkbox-group input[type="checkbox"]:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        /* Button styling */
+        .consent-button {
+            width: 100%;
+            padding: 14px;
+            margin-top: 25px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background-color: #667eea;
+            color: white;
+        }
+
+        .consent-button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .consent-button:not(:disabled):hover {
+            background-color: #764ba2;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(102, 126, 234, 0.3);
+        }
+
+        /* ===== MAIN APP CONTENT ===== */
+        .app-content {
+            display: none;
+        }
+
+        .app-content.visible {
+            display: block;
+        }
+
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .header h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        /* Phase sections */
+        .phase-section {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .phase-section h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .phase-section p {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 12px;
+        }
+
+        .endpoint-list {
+            background: #f8f9fa;
+            padding: 15px 20px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #555;
+            overflow-x: auto;
+        }
+
+        .endpoint-item {
+            margin: 8px 0;
+            padding: 5px 0;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .endpoint-item:last-child {
+            border-bottom: none;
+        }
+
+        .method {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-right: 10px;
+            font-size: 0.85em;
+        }
+
+        .method.get {
+            background-color: #61affe;
+            color: white;
+        }
+
+        .method.post {
+            background-color: #49cc90;
+            color: white;
+        }
+
+        .footer {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            text-align: center;
+            color: #666;
+            margin-top: 30px;
+        }
+
+        .footer p {
+            margin: 10px 0;
+            line-height: 1.6;
+        }
+
+        .beta-badge {
+            display: inline-block;
+            background-color: #ff6b6b;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .consent-modal-content {
+                padding: 25px;
+                max-width: 95vw;
+            }
+
+            .consent-modal-content h1 {
+                font-size: 1.4em;
+            }
+
+            .header h1 {
+                font-size: 1.5em;
+            }
+
+            .phase-section {
+                padding: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- ===== CONSENT MODAL (BLOCKING) ===== -->
+    <div id="consentModal">
+        <div class="consent-modal-content">
+            <h1>🚨 Beta Testing Agreement & Risk Acknowledgment</h1>
+
+            <div class="consent-terms">
+                <p><strong>1. Experimental System (As-Is):</strong> Rural India AI is an experimental beta technology. The service is provided 'AS IS' and 'AS AVAILABLE' without warranties of any kind. Responses may be inaccurate, incomplete, or misleading.</p>
+
+                <p><strong>2. Not Professional Advice:</strong> The information provided by the Healthcare and Agriculture agents is for general informational purposes only. IT DOES NOT CONSTITUTE MEDICAL, LEGAL, OR PROFESSIONAL AGRICULTURAL ADVICE. Always consult a certified medical professional for health issues and a Krishi Vigyan Kendra (KVK) for farming decisions.</p>
+
+                <p><strong>3. Limitation of Liability:</strong> Under no circumstances shall the creators be liable for any direct, indirect, incidental, or consequential damages arising from the use of or reliance on this AI system.</p>
+
+                <p><strong>4. Data & Privacy:</strong> For safety and system improvement, all interactions, including voice and text inputs, are monitored and logged.</p>
+
+                <p><strong>5. Governing Law:</strong> These terms shall be governed by and construed in accordance with the laws of India, and any disputes shall be subject to the exclusive jurisdiction of the courts located in New Delhi.</p>
+            </div>
+
+            <div class="consent-checkbox-group">
+                <input 
+                    type="checkbox" 
+                    id="consentCheckbox" 
+                    name="consent"
+                    onchange="updateConsentButton()"
+                >
+                <label for="consentCheckbox">
+                    <strong>I have read and agree to the Beta Terms.</strong> I understand this is not professional advice and that AI responses may be inaccurate. I acknowledge the experimental nature of this system and accept all associated risks.
+                </label>
+            </div>
+
+            <button 
+                id="consentButton" 
+                class="consent-button" 
+                disabled
+                onclick="acceptConsent()"
+            >
+                ✓ Enter Beta Platform
+            </button>
+        </div>
+    </div>
+
+    <!-- ===== MAIN APP CONTENT ===== -->
+    <div class="app-content">
+        <!-- Beta Warning Banner -->
+        <div class="beta-warning-banner">
+            BETA VERSION: AI responses may be inaccurate. Do not use for medical emergencies.
+        </div>
+
+        <div class="container">
+            <!-- Header -->
+            <div class="header">
+                <h1>Rural India AI <span class="beta-badge">BETA</span></h1>
+                <p>Edge-native AI platform for rural villages</p>
+                <p style="font-size: 0.9em; color: #888; margin-top: 15px;">
+                    🔐 Your data is securely processed and monitored for quality and safety
+                </p>
+            </div>
+
+            <!-- Phase 1: Edge Infrastructure -->
+            <div class="phase-section">
+                <h2>🔷 Phase 1: Edge Infrastructure</h2>
+                <p>Monitor system health, hardware resources, and power management on edge devices.</p>
+                <div class="endpoint-list">
+                    <div class="endpoint-item"><span class="method get">GET</span> /api/v1/health</div>
+                    <div class="endpoint-item"><span class="method get">GET</span> /api/v1/hardware</div>
+                    <div class="endpoint-item"><span class="method get">GET</span> /api/v1/power</div>
+                    <div class="endpoint-item"><span class="method get">GET</span> /api/v1/status</div>
+                    <div class="endpoint-item"><span class="method post">POST</span> /api/v1/sync</div>
+                </div>
+            </div>
+
+            <!-- Phase 2: Voice Interface -->
+            <div class="phase-section">
+                <h2>🎤 Phase 2: Voice Interface (9 Languages)</h2>
+                <p>Multi-language support including Hindi, Tamil, Telugu, Kannada, Malayalam, Gujarati, Marathi, Bengali, and English.</p>
+                <div class="endpoint-list">
+                    <div class="endpoint-item"><span class="method get">GET</span> /api/v2/languages</div>
+                    <div class="endpoint-item"><span class="method post">POST</span> /api/v2/query</div>
+                    <div class="endpoint-item"><span class="method post">POST</span> /api/v2/voice</div>
+                </div>
+            </div>
+
+            <!-- Phase 3: Vector Database -->
+            <div class="phase-section">
+                <h2>📚 Phase 3: Vector Database & RAG</h2>
+                <p>Semantic search and Retrieval-Augmented Generation for accurate information retrieval.</p>
+                <div class="endpoint-list">
+                    <div class="endpoint-item"><span class="method get">GET</span> /api/v3/stats</div>
+                    <div class="endpoint-item"><span class="method post">POST</span> /api/v3/search</div>
+                    <div class="endpoint-item"><span class="method post">POST</span> /api/v3/documents</div>
+                </div>
+            </div>
+
+            <!-- Phase 4: Domain Agents -->
+            <div class="phase-section">
+                <h2>🤖 Phase 4: Domain Agents</h2>
+                <p><strong>⚠️ Healthcare & Agriculture agents provide informational guidance only.</strong> Medical and agricultural responses include mandatory disclaimers. Always consult qualified professionals.</p>
+                <div class="endpoint-list">
+                    <div class="endpoint-item"><span class="method get">GET</span> /api/v4/agents</div>
+                    <div class="endpoint-item"><span class="method post">POST</span> /api/v4/agents/query</div>
+                </div>
+            </div>
+
+            <!-- Phase 5: Safety Guardrails -->
+            <div class="phase-section">
+                <h2>🛡️ Phase 5: Safety Guardrails & Trust</h2>
+                <p>Content filtering, bias detection, and trust scoring to ensure responsible AI.</p>
+                <div class="endpoint-list">
+                    <div class="endpoint-item"><span class="method post">POST</span> /api/v5/safety/check</div>
+                    <div class="endpoint-item"><span class="method post">POST</span> /api/v5/trust/score</div>
+                </div>
+            </div>
+
+            <!-- Phase 6: Observability -->
+            <div class="phase-section">
+                <h2>📊 Phase 6: Observability & Analytics</h2>
+                <p>Real-time metrics, usage analytics, and health monitoring.</p>
+                <div class="endpoint-list">
+                    <div class="endpoint-item"><span class="method get">GET</span> /api/v6/dashboard</div>
+                    <div class="endpoint-item"><span class="method get">GET</span> /api/v6/metrics</div>
+                    <div class="endpoint-item"><span class="method get">GET</span> /api/v6/analytics</div>
+                    <div class="endpoint-item"><span class="method get">GET</span> /api/v6/health</div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="footer">
+                <p><strong>Beta Program Status</strong></p>
+                <p>This is a beta release. Thank you for testing and providing feedback!</p>
+                <p style="font-size: 0.9em; margin-top: 20px; color: #999;">
+                    Version 1.0.0 Beta | All interactions are monitored and logged for safety and improvement
+                </p>
+                <p style="font-size: 0.85em; margin-top: 20px; color: #bbb;">
+                    🔒 Data Privacy Protected | 🛡️ Safety Guardrails Active | 📊 Observability Enabled
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===== CONSENT MODAL LOGIC =====
+        
+        // Check if user has already consented
+        function checkConsent() {
+            const consentGiven = localStorage.getItem('ruralindiaai_consent');
+            if (consentGiven === 'true') {
+                hideConsentModal();
+            }
+        }
+
+        // Update consent button state
+        function updateConsentButton() {
+            const checkbox = document.getElementById('consentCheckbox');
+            const button = document.getElementById('consentButton');
+            button.disabled = !checkbox.checked;
+        }
+
+        // Accept consent and save to localStorage
+        function acceptConsent() {
+            const checkbox = document.getElementById('consentCheckbox');
+            if (checkbox.checked) {
+                localStorage.setItem('ruralindiaai_consent', 'true');
+                localStorage.setItem('ruralindiaai_consent_timestamp', new Date().toISOString());
+                hideConsentModal();
+            }
+        }
+
+        // Hide modal and show app
+        function hideConsentModal() {
+            const modal = document.getElementById('consentModal');
+            const appContent = document.querySelector('.app-content');
+            
+            modal.style.display = 'none';
+            appContent.classList.add('visible');
+            
+            // Log consent for compliance
+            console.log('✅ User consented to beta terms at', new Date().toISOString());
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            checkConsent();
+            
+            // Prevent accidental page navigation without re-confirming
+            window.addEventListener('beforeunload', function(e) {
+                if (localStorage.getItem('ruralindiaai_consent') === 'true') {
+                    // Allow navigation
+                    return;
+                }
+            });
+        });
+
+        // Prevent scrolling when modal is open
+        function preventScroll() {
+            const consentGiven = localStorage.getItem('ruralindiaai_consent');
+            if (!consentGiven || consentGiven !== 'true') {
+                document.body.style.overflow = 'hidden';
+            }
+        }
+
+        preventScroll();
+    </script>
+</body>
+</html>

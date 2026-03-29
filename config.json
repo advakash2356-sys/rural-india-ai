@@ -1,0 +1,11 @@
+{
+    "app_name": "Rural India AI",
+    "environment": "development",
+    "api_host": "127.0.0.1",
+    "api_port": 8000,
+    "debug": true,
+    "languages": ["en", "hi", "te", "ta", "kn", "ml", "mr", "bn", "gu"],
+    "data_path": "./data",
+    "logs_path": "./logs",
+    "max_workers": 4
+}

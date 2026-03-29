@@ -1,0 +1,29 @@
+# Minimal Dockerfile for rural edge nodes
+FROM arm32v7/alpine:3.18
+
+LABEL maintainer="Rural India AI Team"
+LABEL description="Edge-native AI for rural India villages"
+
+RUN apk add --no-cache \
+    python3 \
+    py3-pip \
+    py3-psutil \
+    py3-asyncio \
+    libffi-dev \
+    musl-dev
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY edge_node ./edge_node
+COPY main.py api.py ./
+
+# Non-root user for security
+RUN addgroup -S ainode && adduser -S ainode -G ainode
+USER ainode
+
+EXPOSE 8000
+
+CMD ["python3", "main.py"]
