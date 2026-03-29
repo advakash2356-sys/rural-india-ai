@@ -4,6 +4,7 @@ Phase 4 Feature
 """
 
 import logging
+import os
 from typing import Dict, Any, List
 from abc import ABC, abstractmethod
 
@@ -159,7 +160,46 @@ class AgentOrchestrator:
             HealthcareAgent(),
             EducationAgent(),
         ]
-        logger.info(f"AgentOrchestrator initialized with {len(self.agents)} agents")
+        logger.info(f"✅ AgentOrchestrator initialized with {len(self.agents)} agents")
+        
+        # ⚠️ CRITICAL: Check for LLM API keys
+        self._check_llm_configuration()
+    
+    def _check_llm_configuration(self):
+        """Check if LLM API keys are configured and warn if missing."""
+        openai_key = os.getenv('OPENAI_API_KEY', '').strip()
+        anthropic_key = os.getenv('ANTHROPIC_API_KEY', '').strip()
+        llm_provider = os.getenv('LLM_PROVIDER', 'not_configured').lower()
+        
+        logger.info("═══════════════════════════════════════════════════════════════")
+        logger.info("🔍 LLM CONFIGURATION CHECK")
+        logger.info("═══════════════════════════════════════════════════════════════")
+        
+        if openai_key:
+            logger.info("✅ OPENAI_API_KEY: Configured (found in environment)")
+        else:
+            logger.warning("⚠️  OPENAI_API_KEY: NOT SET - Agent responses will use hardcoded fallbacks")
+        
+        if anthropic_key:
+            logger.info("✅ ANTHROPIC_API_KEY: Configured (found in environment)")
+        else:
+            logger.warning("⚠️  ANTHROPIC_API_KEY: NOT SET - Agent responses will use hardcoded fallbacks")
+        
+        logger.info(f"📋 LLM_PROVIDER: {llm_provider} (use 'openai', 'anthropic', or 'mock')")
+        
+        if not (openai_key or anthropic_key):
+            logger.error("❌ NO LLM API KEYS CONFIGURED!")
+            logger.error("   Agents will return hardcoded responses only.")
+            logger.error("   To enable real LLM responses, set one of:")
+            logger.error("   - OPENAI_API_KEY=sk-... (for GPT models)")
+            logger.error("   - ANTHROPIC_API_KEY=sk-ant-... (for Claude models)")
+            logger.error("")
+            logger.error("   [On Render] Set these in Environment Variables dashboard")
+            logger.error("   [Local] Add to .env file and reload the app")
+        else:
+            logger.info("✅ LLM is properly configured - Agents will generate responses")
+        
+        logger.info("═══════════════════════════════════════════════════════════════")
     
     async def route_query(self, query: str, context: Dict[str, Any]) -> Dict[str, Any]:
         """

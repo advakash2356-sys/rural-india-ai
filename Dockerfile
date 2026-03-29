@@ -2,7 +2,7 @@ FROM python:3.9-slim
 
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies including FFmpeg (CRITICAL for Whisper audio processing)
 RUN apt-get update && apt-get install -y \
     build-essential \
     libffi-dev \
@@ -10,7 +10,11 @@ RUN apt-get update && apt-get install -y \
     alsa-utils \
     sox \
     curl \
-    && rm -rf /var/lib/apt/lists/*
+    ffmpeg \
+    libsm6 \
+    libxext6 \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists*
 
 # Copy requirements
 COPY requirements.txt .

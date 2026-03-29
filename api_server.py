@@ -5,8 +5,10 @@ REST API Server - Expose all Rural India AI functionality
 import asyncio
 import logging
 import os
+import io
+import numpy as np
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, File, UploadFile
 from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -289,26 +291,118 @@ async def text_query(request: QueryRequest, background_tasks: BackgroundTasks):
 
 
 @app.post("/api/v2/voice")
-async def voice_interaction(request: VoiceQueryRequest):
-    """Process voice query (simulated - real implementation uses audio hardware)"""
+async def voice_interaction(
+    file: UploadFile = File(...),
+    language: str = "auto"
+):
+    """
+    Process voice query from audio file (WebM or WAV format).
+    
+    Args:
+        file: Audio file (WebM with Opus codec or WAV)
+        language: Language code ('hi', 'en', 'auto' for auto-detect)
+    
+    Returns:
+        Transcription result with optional agent response
+    """
     if not voice_service:
+        logger.error("Voice service not initialized")
         raise HTTPException(status_code=503, detail="Voice service not initialized")
     
+    if not file:
+        logger.warning("No audio file provided in voice request")
+        raise HTTPException(status_code=400, detail="No audio file provided")
+    
     try:
+        # Log incoming audio request
+        logger.info(f"🎙️ Received voice request - File: {file.filename}, Size: {file.size} bytes, Language: {language}")
+        
+        # Read audio file into memory
+        audio_data = await file.read()
+        
+        if len(audio_data) == 0:
+            logger.warning("Received empty audio file")
+            raise HTTPException(status_code=400, detail="Audio file is empty")
+        
+        logger.debug(f"Audio data read: {len(audio_data)} bytes from {file.filename}")
+        
         # Set language
-        voice_service.set_language(request.language)
+        if language != "auto":
+            voice_service.set_language(language)
+            logger.info(f"Language set to: {language}")
         
-        # In production: record actual audio and process
-        # For now: return ready status
-        return {
-            "status": "ready",
-            "language": request.language,
-            "message": "Voice query Ready (connect microphone for audio input)"
-        }
+        # Process audio through Whisper
+        try:
+            # Try to load audio using librosa (handles WebM, WAV, etc. via FFmpeg)
+            import librosa
+            import soundfile as sf
+            
+            logger.debug("Attempting to decode audio with librosa...")
+            
+            # Load audio file from bytes
+            audio_bytes_io = io.BytesIO(audio_data)
+            audio_np, sr = librosa.load(audio_bytes_io, sr=16000, mono=True)
+            
+            logger.info(f"✅ Audio decoded successfully - Sample rate: {sr}, Duration: {len(audio_np)/sr:.2f}s")
+            
+            # Transcribe using Speech-to-Text engine
+            stt_engine = voice_service.pipeline.stt_engine
+            transcription_result = await stt_engine.transcribe(audio_np)
+            
+            text = transcription_result.get("text", "").strip()
+            success = transcription_result.get("success", False)
+            
+            if not text:
+                logger.warning("Transcription produced empty text")
+                return {
+                    "status": "error",
+                    "transcription": "",
+                    "language": language,
+                    "error": "No speech detected in audio",
+                    "success": False
+                }
+            
+            logger.info(f"✅ Transcription successful: '{text[:100]}...'")
+            
+            # Optional: Route to agent for response
+            response_text = None
+            if agent_orchestrator and text:
+                try:
+                    logger.debug(f"Routing transcribed text to agent: {text[:50]}...")
+                    agent_result = await agent_orchestrator.route_query(text, {})
+                    response_text = agent_result.get("response")
+                    logger.info(f"✅ Agent responded: {response_text[:100] if response_text else 'None'}...")
+                except Exception as agent_error:
+                    logger.error(f"Agent routing failed: {agent_error}", exc_info=True)
+                    # Continue with just transcription if agent fails
+            
+            return {
+                "status": "success",
+                "transcription": text,
+                "language": language or "auto",
+                "confidence": transcription_result.get("confidence", 0.0),
+                "response": response_text,
+                "success": True
+            }
+            
+        except ImportError as import_err:
+            logger.error(f"❌ librosa/soundfile not available: {import_err}", exc_info=True)
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Audio decoding library not installed. Error: {str(import_err)}"
+            )
+        except Exception as decode_err:
+            logger.error(f"❌ Audio decoding failed: {decode_err}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to decode audio: {str(decode_err)}. Ensure FFmpeg is installed and audio format is correct (WebM or WAV)."
+            )
         
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions
     except Exception as e:
-        logger.error(f"Voice interaction error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"❌ Unexpected error in voice_interaction: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Voice processing failed: {str(e)}")
 
 
 @app.get("/api/v2/languages")
@@ -382,27 +476,58 @@ async def vector_db_stats():
 
 @app.post("/api/v4/agents/query")
 async def agent_query(request: QueryRequest):
-    """Route query to appropriate domain agent"""
+    """
+    Route query to appropriate domain agent.
+    
+    CRITICAL: This endpoint logs all LLM invocation failures to help diagnose
+    why agents are returning hardcoded fallbacks instead of real LLM responses.
+    Check server logs (search for 'LLM FAILURE' or 'AGENT ERROR') to debug issues.
+    """
     if not agent_orchestrator:
+        logger.error("❌ AGENT ERROR: Agent orchestrator not initialized")
         raise HTTPException(status_code=503, detail="Agent system not initialized")
     
-    result = await agent_orchestrator.route_query(request.query, {})
-    
-    # Add mandatory disclaimers based on domain (PHASE 3: HARDENED LEGAL UI)
-    domain = result.get("domain", "").lower()
-    response_text = result.get("response", "")
-    
-    if domain == "healthcare":
-        response_text += "\n\n🛑 DISCLAIMER: I am an AI, not a doctor. Please consult a local medical professional before making health decisions."
-    elif domain == "agriculture":
-        response_text += "\n\n🛑 DISCLAIMER: This is automated guidance. Verify with a local agricultural expert or KVK (Krishi Vigyan Kendra)."
-    
-    result["response"] = response_text
-    
-    # Log interaction for compliance monitoring
-    logger.info(f"[BETA] Agent query - Domain: {domain}, ConsentRequired: {REQUIRE_CONSENT}")
-    
-    return result
+    try:
+        logger.info(f"📋 Agent query received - Query: '{request.query[:100]}...'")
+        
+        # Route to appropriate agent
+        try:
+            result = await agent_orchestrator.route_query(request.query, {})
+            logger.debug(f"✅ Agent routing successful - Agent: {result.get('agent')}, Domain: {result.get('domain')}")
+        except Exception as routing_error:
+            logger.error(f"❌ LLM FAILURE [AGENT ROUTING]: {type(routing_error).__name__}: {str(routing_error)}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Agent routing failed: {str(routing_error)}")
+        
+        response_text = result.get("response", "")
+        domain = result.get("domain", "").lower()
+        agent_name = result.get("agent", "Unknown")
+        
+        logger.info(f"Agent: {agent_name}, Domain: {domain}, Response length: {len(response_text)} chars")
+        
+        # Add mandatory disclaimers based on domain (PHASE 3: HARDENED LEGAL UI)
+        if domain == "healthcare":
+            response_text += "\n\n🛑 DISCLAIMER: I am an AI, not a doctor. Please consult a local medical professional before making health decisions."
+            logger.debug("Healthcare disclaimer added")
+        elif domain == "agriculture":
+            response_text += "\n\n🛑 DISCLAIMER: This is automated guidance. Verify with a local agricultural expert or KVK (Krishi Vigyan Kendra)."
+            logger.debug("Agriculture disclaimer added")
+        
+        result["response"] = response_text
+        
+        # Log interaction for compliance monitoring
+        logger.info(f"[BETA] Agent query - Domain: {domain}, Agent: {agent_name}, ConsentRequired: {REQUIRE_CONSENT}")
+        
+        return result
+        
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions
+    except Exception as e:
+        logger.error(f"❌ LLM FAILURE [AGENT QUERY ENDPOINT]: {type(e).__name__}: {str(e)}", exc_info=True)
+        logger.warning("⚠️ CRITICAL: Check if LLM API keys are configured (see environment variables below):")
+        logger.warning(f"   - OPENAI_API_KEY: {'SET' if os.getenv('OPENAI_API_KEY') else '❌ NOT SET'}")
+        logger.warning(f"   - ANTHROPIC_API_KEY: {'SET' if os.getenv('ANTHROPIC_API_KEY') else '❌ NOT SET'}")
+        logger.warning(f"   - LLM_PROVIDER: {os.getenv('LLM_PROVIDER', 'Not configured (defaults to hardcoded agents)')}")
+        raise HTTPException(status_code=500, detail=f"Agent processing failed: {str(e)}")
 
 
 @app.get("/api/v4/agents")
