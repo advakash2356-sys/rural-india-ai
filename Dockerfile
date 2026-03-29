@@ -15,13 +15,18 @@ RUN apt-get update && apt-get install -y \
 # Copy requirements
 COPY requirements.txt .
 
-# Upgrade pip and install build tools BEFORE requirements
-# This fixes: ModuleNotFoundError: No module named 'pkg_resources'
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+# Master fix for pkg_resources: openai-whisper setuptools issue
+# Step 1: Upgrade and ensure pip is modern
+RUN pip install --no-cache-dir --upgrade pip
 
-# Install Python dependencies
-# Use --no-build-isolation so packages can use the upgraded setuptools
-# This prevents: ModuleNotFoundError: No module named 'pkg_resources' in openai-whisper build
+# Step 2: Install setuptools, wheel, and setuptools_scm (provides pkg_resources)
+RUN pip install --no-cache-dir --upgrade 'setuptools>=67.0.0' wheel setuptools_scm
+
+# Step 3: Use stdlib distutils and install requirements  
+# Environment variable helps packages avoid setuptools import issues
+ENV SETUPTOOLS_USE_DISTUTILS=stdlib
+
+# Step 4: Install all Python dependencies with no isolation (accesses system setuptools)
 RUN pip install --no-cache-dir --no-build-isolation -r requirements.txt
 
 # Copy application code
