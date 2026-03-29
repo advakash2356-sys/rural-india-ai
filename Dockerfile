@@ -15,19 +15,23 @@ RUN apt-get update && apt-get install -y \
 # Copy requirements
 COPY requirements.txt .
 
-# Master fix for pkg_resources: openai-whisper setuptools issue
-# Step 1: Upgrade and ensure pip is modern
-RUN pip install --no-cache-dir --upgrade pip
+# Expert fix for openai-whisper pkg_resources issue
+# The problem: openai-whisper's setup.py imports pkg_resources at module level
+# Solution: Install dependency chain explicitly, then force wheel installation
 
-# Step 2: Install setuptools, wheel, and setuptools_scm (provides pkg_resources)
-RUN pip install --no-cache-dir --upgrade 'setuptools>=67.0.0' wheel setuptools_scm
+# Step 1: Upgrade pip and core tools
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
-# Step 3: Use stdlib distutils and install requirements  
-# Environment variable helps packages avoid setuptools import issues
-ENV SETUPTOOLS_USE_DISTUTILS=stdlib
+# Step 2: Force install setuptools into Python's default import path
+RUN pip install --force-reinstall --no-cache-dir --no-deps 'setuptools>=67.0.0'
 
-# Step 4: Install all Python dependencies with no isolation (accesses system setuptools)
-RUN pip install --no-cache-dir --no-build-isolation -r requirements.txt
+# Step 3: Install openai-whisper FIRST, using only pre-built wheels (avoids setup.py build)
+# This prevents the ModuleNotFoundError in the subprocess
+RUN pip install --no-cache-dir --only-binary :all: openai-whisper || pip install --no-cache-dir openai-whisper
+
+# Step 4: Install remaining dependencies
+# By this point, setuptools is properly initialized and in Python path
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY . .
